@@ -1,14 +1,11 @@
+using System.Runtime.CompilerServices;
+
 namespace HungryMonster
 {
     public partial class HungryMonster : Form
     {
         Image heroIdle;
-        bool goLeft, goRight, jumping, hasMelon;
-        int jumpSpeed = 10;
-        int force = 0;
-        int score = 0;
-        int playerSpeed = 1;
-        int backgroundSpeed = 3;
+        Player player = new Player();
 
         public HungryMonster()
         {
@@ -17,77 +14,81 @@ namespace HungryMonster
         }
 
         private void MainTimerEvent(object sender, EventArgs e)
-        {
-            textLabel.Text = "SCORE: " + score;
-            PinkMonster.Top += jumpSpeed;
+        {            
+            PinkMonster.Refresh();
+            textLabel.Text = "SCORE: " + player.score;
+            PinkMonster.Top += player.jumpSpeed;
+            var movement = new PlayerMovement(PinkMonster.Left, PinkMonster.Width, ClientSize.Width);
 
-            if (goLeft && PinkMonster.Left > 60)
-                PinkMonster.Left -= playerSpeed;
-            if (goRight && PinkMonster.Left + (PinkMonster.Width) < ClientSize.Width)
-                PinkMonster.Left += playerSpeed;
 
-            if (goLeft && background.Left < 0)
+            //if (player.goLeft && PinkMonster.Left > 60)
+            //    PinkMonster.Left -= player.playerSpeed;
+            //if (player.goRight && PinkMonster.Left + PinkMonster.Width < ClientSize.Width)
+            //    PinkMonster.Left += player.playerSpeed;
+
+            movement.PlayerMoveLeft();
+            movement.PlayerMoveRight();
+
+            if (player.goLeft && background.Left < 2)
             {
-                background.Left += backgroundSpeed;
+                background.Left += player.backgroundSpeed;
                 MoveGameElements("forward");
             }
 
-            if (goRight && background.Left > -709)
+            if (player.goRight && background.Left > -709)
             {
-                background.Left -= backgroundSpeed;
+                background.Left -= player.backgroundSpeed;
                 MoveGameElements("back");
             }
 
-            if (jumping)
+            if (player.jumping)
             {
-                jumpSpeed = -8;
-                force--;
+                player.jumpSpeed = -8;
+                player.force--;
             }
 
             else
-            {
-                jumpSpeed = 8;
-            }
+                player.jumpSpeed = 8;
 
-            if (jumping && force < 0)
-                jumping = false;
+            if (player.jumping && player.force < 0)
+                player.jumping = false;
 
             foreach (Control x in Controls)
             {
-                if (x is PictureBox && (string)x.Tag == "platform")
+                if (IsPictureBoxItem(x, "platform"))
                 {
-                    if (PinkMonster.Bounds.IntersectsWith(x.Bounds) && !jumping)
+                    if (IsPlayerCollideItem(x) && !player.jumping)
                     {
-                        force = 4;
+                        player.force = 4;
                         PinkMonster.Top = x.Top - PinkMonster.Height;
-                        jumpSpeed = 0;
+                        player.jumpSpeed = 0;
                     }
                     x.BringToFront();
                 }
 
-                if (x is PictureBox && (string)x.Tag == "fruit")
+                if (IsPictureBoxItem(x, "fruit"))
                 {
-                    if (PinkMonster.Bounds.IntersectsWith(x.Bounds))
+                    if (IsPlayerCollideItem(x))
                     {
                         Controls.Remove(x);
-                        score++;
+                        player.score++;
                     }
                 }
             }
 
-            if (PinkMonster.Bounds.IntersectsWith(melon.Bounds))
+            if (IsPlayerCollideItem(melon))
             {
                 melon.Visible = false;
-                hasMelon = true;
+                player.hasMelon = true;
             }
 
-                if (PinkMonster.Bounds.IntersectsWith(finishPoint.Bounds) && hasMelon)
-                {
-                    finishPoint.Image = Properties.Resources.finishPoint;
-                    GameTimer.Stop();
-                    MessageBox.Show("You Completed the level!");
-                }
-            if (PinkMonster.Top + PinkMonster.Height > ClientSize.Height + 60)
+            if (IsPlayerCollideItem(finishPoint) && player.hasMelon)
+            {
+                finishPoint.Image = Properties.Resources.finishPoint;
+                GameTimer.Stop();
+                MessageBox.Show("You Completed the level!");
+            }
+            if (IsPlayerFell())
             {
                 GameTimer.Stop();
                 MessageBox.Show("You Died!");
@@ -98,21 +99,21 @@ namespace HungryMonster
         private void KeyIsDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Left)
-                goLeft = true;
+                player.goLeft = true;
             if (e.KeyCode == Keys.Right)
-                goRight = true;
-            if (e.KeyCode == Keys.Space && jumping == false)
-                jumping = true;
+                player.goRight = true;
+            if (e.KeyCode == Keys.Space && player.jumping == false)
+                player.jumping = true;
         }
 
         private void KeyIsUp(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Left)
-                goLeft = false;
+                player.goLeft = false;
             if (e.KeyCode == Keys.Right)
-                goRight = false;
-            if (!jumping)
-                jumping = false;
+                player.goRight = false;
+            if (!player.jumping)
+                player.jumping = false;
         }
 
         private void CloseGame(object sender, FormClosedEventArgs e)
@@ -129,18 +130,33 @@ namespace HungryMonster
         {
             foreach (Control x in Controls)
             {
-                if (x is PictureBox && (string)x.Tag == "platform" ||
-                    x is PictureBox && (string)x.Tag == "fruit" ||
-                    x is PictureBox && (string)x.Tag == "melon" ||
-                    x is PictureBox && (string)x.Tag == "finishPoint" ||
-                    x is PictureBox && (string)x.Tag == "startPoint")
+                if (IsPictureBoxItem(x, "platform") ||
+                    IsPictureBoxItem(x, "fruit") ||
+                    IsPictureBoxItem(x, "melon") ||
+                    IsPictureBoxItem(x, "finishPoint") ||
+                    IsPictureBoxItem(x, "startPoint"))
                 {
                     if (direction == "back")
-                        x.Left -= backgroundSpeed;
+                        x.Left -= player.backgroundSpeed;
                     if (direction == "forward")
-                        x.Left += backgroundSpeed;
+                        x.Left += player.backgroundSpeed;
                 }
             }
+        }
+
+        private bool IsPlayerFell()
+        {
+            return PinkMonster.Top + PinkMonster.Height > ClientSize.Height + 60;
+        }
+
+        private bool IsPlayerCollideItem(Control x)
+        {
+            return PinkMonster.Bounds.IntersectsWith(x.Bounds);
+        }
+
+        private bool IsPictureBoxItem(Control x, string item)
+        {
+            return x is PictureBox && (string)x.Tag == item;
         }
     }
 }
